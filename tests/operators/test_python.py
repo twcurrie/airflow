@@ -1503,6 +1503,35 @@ class TestCurrentContextRuntime:
             op = MyContextAssertOperator(task_id="assert_context")
             op.run(ignore_first_depends_on_past=True, ignore_ti_state=True)
 
+    @pytest.mark.parametrize(
+        "crontab",
+        ["* * * * *",
+         "10 3 * * 1",
+         "30 10,12,14 * * 1-5 *",
+         "0 3 * * 1"
+         ]
+    )
+    def test_context_in_task_cron(self, crontab):
+        global ds
+        ds = None
+
+        def ds_getter():
+            global ds
+            if ds is None:
+                ds = get_current_context()['ds']
+            else:
+                assert ds == get_current_context()['ds']
+
+        DEFAULT_ARGS["schedule_interval"] = crontab
+        with DAG(dag_id="assert_context_dag", default_args=DEFAULT_ARGS):
+            op = PythonOperator(python_callable=ds_getter, task_id="get_all_the_context")
+            op.run(ignore_first_depends_on_past=True, ignore_ti_state=True)
+
+        DEFAULT_ARGS["schedule_interval"] = f"{crontab} *"
+        with DAG(dag_id="assert_context_dag", default_args=DEFAULT_ARGS):
+            op = PythonOperator(python_callable=ds_getter, task_id="get_all_the_context")
+            op.run(ignore_first_depends_on_past=True, ignore_ti_state=True)
+
     def test_get_context_in_old_style_context_task(self):
         with DAG(dag_id="edge_case_context_dag", default_args=DEFAULT_ARGS):
             op = PythonOperator(python_callable=get_all_the_context, task_id="get_all_the_context")
